@@ -1,37 +1,50 @@
-import { MongoClient } from "mongodb";
 import { orders } from "./orders.js";
+import { client, db } from "./utils/db.js";
+import express from "express";
 
-const connectionString = "mongodb://127.0.0.1:27017";
+async function setupDatabase() {
+  console.log("------- Start connecting to MongoDB -------");
+  
+  await client.connect();
+  console.log("------- Connecting to MongoDB Successfully -------");
 
-console.log("------- Start connecting to MongDB -------");
-export const client = new MongoClient(connectionString, {
-  useUnifiedTopology: true,
-});
+  try {
+    await db.createCollection("pizzaOrders");
+    console.log("------- Create collection successfully -------");
+  } catch {
+    console.log("Collection already exists !");
+  }
 
-await client.connect();
-console.log("------- Connecting to MongoDB Successfully -------");
+  const collection = db.collection("pizzaOrders");
 
-const db = await client.db("practice-mongo");
-console.log("------- Create database successfully -------");
+  await collection.insertMany(
+    orders.map((order) => {
+      return {
+        ...order,
+        created_at: new Date(order.created_at),
+      };
+    })
+  );
 
-try {
-  await db.createCollection("pizzaOrders");
-  console.log("------- Create collection successfully -------");
-} catch {
-  console.log("Collection already exists !");
+  console.log("------- Insert documents successfully -------");
 }
 
-const collection = db.collection("pizzaOrders");
+async function init() {
+  const app = express();
 
-await collection.insertMany(
-  orders.map((order) => {
-    return {
-      ...order,
-      created_at: new Date(order.created_at),
-    };
-  })
-);
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
 
-console.log("------- Insert documents successfully -------");
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`running on http://localhost:${PORT}`);
+  });
+}
 
-await client.close();
+// Run the setup and then start the server
+async function main() {
+  await setupDatabase();
+  await init();
+}
+
+main().catch(console.error);
